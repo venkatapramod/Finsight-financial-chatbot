@@ -4,7 +4,7 @@ import pandas as pd
 import docx2txt
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS  # FAISS is faster than Chroma
+from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
 from langchain.chains import RetrievalQA
@@ -80,10 +80,9 @@ def split_documents(documents):
     
     print(f"✂️ Splitting {len(documents)} documents...")
     
-    # ✅ OPTIMAL chunk size - larger = fewer chunks = faster
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,              # Optimal for financial docs
-        chunk_overlap=150,              # Enough overlap
+        chunk_size=1000,
+        chunk_overlap=150,
         length_function=len,
         separators=["\n\n", "\n", ".", " "]
     )
@@ -93,18 +92,17 @@ def split_documents(documents):
     return chunks
 
 # ------------------------------------------
-# Create Embeddings (SMALL MODEL)
+# Create Embeddings (SMALL MODEL - OPTION 1)
 # ------------------------------------------
 def create_embeddings():
     """Create embeddings with small model for speed"""
     
-    # ✅ SMALLER MODEL - 80MB vs 440MB (5x faster)
+    # ✅ CHANGED: Removed "sentence-transformers/" prefix
     embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",  # Tiny but effective
+        model_name="all-MiniLM-L6-v2",  # Direct model name without prefix
         model_kwargs={'device': 'cpu'},
         encode_kwargs={
             'normalize_embeddings': True
-            # No batch_size needed - FAISS handles batching automatically
         }
     )
     
@@ -130,8 +128,6 @@ def build_vector_db(uploaded_files, groq_api_key=None):
     # Create embeddings (small model)
     embeddings = create_embeddings()
     
-    # ✅ FAISS.from_documents = AUTOMATIC BATCHING!
-    # This single line does ALL the batching work internally
     print("💾 Creating FAISS vector store with automatic batching...")
     vectordb = FAISS.from_documents(
         documents=chunks,
