@@ -10,4 +10,4 @@ openpyxl
 sentence-transformers
 docx2txt
 langsmith==0.0.92
-langchain-core==0.1.40
+langchain-core==0.1.42
