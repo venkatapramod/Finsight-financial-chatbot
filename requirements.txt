@@ -1,11 +1,12 @@
 streamlit
-langchain
-langchain-community
-langchain-groq
-faiss-cpu
+langchain==0.1.0
+langchain-community==0.0.10
+langchain-groq==0.1.0
+faiss-cpu>=1.7.4
 pypdf
 python-docx
 pandas
 openpyxl
 sentence-transformers
 docx2txt
+
