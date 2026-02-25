@@ -2,8 +2,6 @@ streamlit==1.54.0
 langchain==0.1.0
 langchain-community==0.0.10
 langchain-groq==0.1.0
-langchain-core==0.1.40
-langsmith==0.0.92
 faiss-cpu==1.7.4
 pypdf==6.7.2
 python-docx==1.2.0
