@@ -9,4 +9,3 @@ pandas
 openpyxl
 sentence-transformers
 docx2txt
-
