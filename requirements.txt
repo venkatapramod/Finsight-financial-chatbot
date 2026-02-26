@@ -1,11 +1,11 @@
 streamlit==1.32.0
 
-# LANGCHAIN - fully compatible versions
-langchain==0.1.13
-langchain-core==0.1.27
-langchain-community==0.0.24
+# LANGCHAIN compatible versions
+langchain==0.1.20
+langchain-core==0.1.53
+langchain-community==0.0.36
 langchain-text-splitters==0.0.1
-langchain-groq==0.0.1
+langchain-groq==0.0.2
 
 # RAG dependencies
 chromadb==0.5.0
