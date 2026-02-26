@@ -68,11 +68,11 @@ def split_documents(documents):
 
 
 # -------------------------------------------------------------
-# EMBEDDINGS
+# EMBEDDINGS (CPU Optimized)
 # -------------------------------------------------------------
 def create_embeddings():
     return HuggingFaceEmbeddings(
-        model_name="all-MiniLM-L6-v2",
+        model_name="sentence-transformers/all-MiniLM-L6-v2",
         model_kwargs={"device": "cpu"},
         encode_kwargs={"normalize_embeddings": True}
     )
@@ -95,7 +95,7 @@ def build_vector_db(uploaded_files, groq_api_key=None):
 
 
 # -------------------------------------------------------------
-# CUSTOM RAG CHAIN (NO RetrievalQA)
+# IMPROVED FINANCIAL PROMPT (More Confident, Factual)
 # -------------------------------------------------------------
 def build_rag_chain(vectordb, groq_api_key):
     llm = ChatGroq(
@@ -107,10 +107,15 @@ def build_rag_chain(vectordb, groq_api_key):
     retriever = vectordb.as_retriever(search_kwargs={"k": 6})
 
     prompt = PromptTemplate(
-        template="""You are a financial assistant.
+        template="""
+You are a highly accurate financial analysis assistant.
 
-Use the following context to answer the question.
-If the answer cannot be found, say "Not enough information".
+Use ONLY the provided document context to answer.
+Do NOT guess beyond the given data.
+When financial reports use the terms "net sales" or "total net sales",
+treat them as equivalent to "revenue" unless explicitly separated.
+
+Provide clear, strong financial answers.
 
 Context:
 {context}
@@ -118,7 +123,8 @@ Context:
 Question:
 {question}
 
-Answer:""",
+Answer in a direct, factual manner:
+""",
         input_variables=["context", "question"]
     )
 
@@ -133,7 +139,6 @@ def query_document(rag_chain, question):
     retriever = rag_chain["retriever"]
     prompt = rag_chain["prompt"]
 
-    # Get documents
     docs = retriever.get_relevant_documents(question)
     context = "\n\n".join([d.page_content for d in docs])
 
