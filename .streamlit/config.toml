@@ -1,5 +1,3 @@
-# .streamlit/config.toml
-
 [ui]
 hideShare = true
 hideFooter = true
