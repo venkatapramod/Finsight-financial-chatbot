@@ -6,14 +6,9 @@ import docx2txt
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# Use ChromaDB (FAISS removed)
 from langchain_community.vectorstores import Chroma
-
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
-
-# ⭐ CORRECT IMPORT FOR langchain==0.1.0
-from langchain.chains.retrieval import RetrievalQA
 
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
@@ -33,8 +28,6 @@ def load_documents(uploaded_files):
             with open(temp_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
 
-            print(f"📄 Processing: {uploaded_file.name}")
-
             # PDF
             if file_name.endswith(".pdf"):
                 loader = PyPDFLoader(temp_path)
@@ -46,30 +39,20 @@ def load_documents(uploaded_files):
             # DOCX
             elif file_name.endswith(".docx"):
                 text = docx2txt.process(temp_path)
-                docs.append(Document(
-                    page_content=text,
-                    metadata={"source": uploaded_file.name}
-                ))
+                docs.append(Document(page_content=text, metadata={"source": uploaded_file.name}))
 
             # EXCEL
             elif file_name.endswith((".xlsx", ".xls")):
                 df = pd.read_excel(temp_path)
                 text = df.to_string(index=False)
-                docs.append(Document(
-                    page_content=text,
-                    metadata={"source": uploaded_file.name}
-                ))
+                docs.append(Document(page_content=text, metadata={"source": uploaded_file.name}))
 
             # TXT
             elif file_name.endswith(".txt"):
                 with open(temp_path, "r", encoding="utf-8") as f:
                     text = f.read()
-                docs.append(Document(
-                    page_content=text,
-                    metadata={"source": uploaded_file.name}
-                ))
+                docs.append(Document(page_content=text, metadata={"source": uploaded_file.name}))
 
-    print(f"📊 Total loaded: {len(docs)} sections")
     return docs
 
 
@@ -77,75 +60,57 @@ def load_documents(uploaded_files):
 # SPLIT DOCUMENTS
 # -------------------------------------------------------------
 def split_documents(documents):
-    print(f"✂️ Splitting {len(documents)} documents...")
-
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
-        chunk_overlap=150,
-        separators=["\n\n", "\n", ".", " "]
+        chunk_overlap=150
     )
-
-    chunks = splitter.split_documents(documents)
-    print(f"✅ Created {len(chunks)} chunks")
-    return chunks
+    return splitter.split_documents(documents)
 
 
 # -------------------------------------------------------------
 # EMBEDDINGS
 # -------------------------------------------------------------
 def create_embeddings():
-    print("⚡ Using Embeddings: all-MiniLM-L6-v2")
-
-    embed = HuggingFaceEmbeddings(
+    return HuggingFaceEmbeddings(
         model_name="all-MiniLM-L6-v2",
         model_kwargs={"device": "cpu"},
         encode_kwargs={"normalize_embeddings": True}
     )
-    return embed
 
 
 # -------------------------------------------------------------
-# BUILD VECTOR DB (CHROMA)
+# BUILD VECTOR DB
 # -------------------------------------------------------------
 def build_vector_db(uploaded_files, groq_api_key=None):
     docs = load_documents(uploaded_files)
-    if not docs:
-        raise ValueError("No documents loaded")
-
     chunks = split_documents(docs)
     embeddings = create_embeddings()
-
-    print("💾 Creating Chroma vector store...")
 
     vectordb = Chroma.from_documents(
         documents=chunks,
         embedding=embeddings,
         collection_name="financial_docs"
     )
-
-    print("✅ Vector DB Ready!")
     return vectordb
 
 
 # -------------------------------------------------------------
-# BUILD RAG CHAIN
+# CUSTOM RAG CHAIN (NO RetrievalQA)
 # -------------------------------------------------------------
 def build_rag_chain(vectordb, groq_api_key):
-    retriever = vectordb.as_retriever(
-        search_type="similarity",
-        search_kwargs={"k": 6}
-    )
-
     llm = ChatGroq(
         api_key=groq_api_key,
         model_name="llama-3.1-8b-instant",
         temperature=0
     )
 
-    prompt = PromptTemplate(
-        template="""You are a Financial AI Assistant.
+    retriever = vectordb.as_retriever(search_kwargs={"k": 6})
 
-Use ONLY the context below to answer.
+    prompt = PromptTemplate(
+        template="""You are a financial assistant.
+
+Use the following context to answer the question.
+If the answer cannot be found, say "Not enough information".
 
 Context:
 {context}
@@ -153,31 +118,30 @@ Context:
 Question:
 {question}
 
-If the answer is not present in the context, reply: "Not enough information."
-""",
+Answer:""",
         input_variables=["context", "question"]
     )
 
-    qa = RetrievalQA.from_chain_type(
-        llm=llm,
-        retriever=retriever,
-        chain_type="stuff",
-        chain_type_kwargs={"prompt": prompt},
-        return_source_documents=True
-    )
-
-    return qa
+    return {"llm": llm, "retriever": retriever, "prompt": prompt}
 
 
 # -------------------------------------------------------------
 # QUERY FUNCTION
 # -------------------------------------------------------------
-def query_document(qa_chain, question):
-    try:
-        result = qa_chain.invoke({"query": question})
-        return {
-            "answer": result.get("result", "No answer available"),
-            "source_documents": result.get("source_documents", [])
-        }
-    except Exception as e:
-        return {"answer": f"Error: {str(e)}", "source_documents": []}
+def query_document(rag_chain, question):
+    llm = rag_chain["llm"]
+    retriever = rag_chain["retriever"]
+    prompt = rag_chain["prompt"]
+
+    # Get documents
+    docs = retriever.get_relevant_documents(question)
+    context = "\n\n".join([d.page_content for d in docs])
+
+    final_prompt = prompt.format(context=context, question=question)
+
+    answer = llm.invoke(final_prompt)
+
+    return {
+        "answer": answer,
+        "source_documents": docs
+    }
