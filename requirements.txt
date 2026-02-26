@@ -1,15 +1,16 @@
 streamlit==1.32.0
 
-# LANGCHAIN compatible versions
-langchain==0.1.20
+# LangChain + RAG deps
+langchain==0.1.32
 langchain-core==0.1.53
 langchain-community==0.0.36
 langchain-text-splitters==0.0.1
 langchain-groq==0.0.2
 
-# RAG dependencies
 chromadb==0.5.0
 sentence-transformers==2.6.1
+
+# Misc
 tiktoken
 python-dotenv
 requests
