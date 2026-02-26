@@ -6,5 +6,6 @@ langchain-text-splitters
 chromadb
 sentence-transformers
 tiktoken
-requests
 python-dotenv
+requests
+docx2txt
