@@ -6,13 +6,13 @@ import docx2txt
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# ⭐ FIXED: FAISS removed — ChromaDB works on Streamlit Cloud
+# Use ChromaDB (FAISS removed)
 from langchain_community.vectorstores import Chroma
 
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
 
-# ⭐ FIXED: Correct import for LangChain 0.1+
+# ⭐ CORRECT IMPORT FOR langchain==0.1.0
 from langchain.chains.retrieval import RetrievalQA
 
 from langchain.prompts import PromptTemplate
@@ -30,7 +30,6 @@ def load_documents(uploaded_files):
             file_name = uploaded_file.name.lower()
             temp_path = os.path.join(temp_dir, uploaded_file.name)
 
-            # Save uploaded file to temp dir
             with open(temp_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
 
@@ -47,19 +46,28 @@ def load_documents(uploaded_files):
             # DOCX
             elif file_name.endswith(".docx"):
                 text = docx2txt.process(temp_path)
-                docs.append(Document(page_content=text, metadata={"source": uploaded_file.name}))
+                docs.append(Document(
+                    page_content=text,
+                    metadata={"source": uploaded_file.name}
+                ))
 
             # EXCEL
             elif file_name.endswith((".xlsx", ".xls")):
                 df = pd.read_excel(temp_path)
                 text = df.to_string(index=False)
-                docs.append(Document(page_content=text, metadata={"source": uploaded_file.name}))
+                docs.append(Document(
+                    page_content=text,
+                    metadata={"source": uploaded_file.name}
+                ))
 
             # TXT
             elif file_name.endswith(".txt"):
                 with open(temp_path, "r", encoding="utf-8") as f:
                     text = f.read()
-                docs.append(Document(page_content=text, metadata={"source": uploaded_file.name}))
+                docs.append(Document(
+                    page_content=text,
+                    metadata={"source": uploaded_file.name}
+                ))
 
     print(f"📊 Total loaded: {len(docs)} sections")
     return docs
@@ -137,7 +145,7 @@ def build_rag_chain(vectordb, groq_api_key):
     prompt = PromptTemplate(
         template="""You are a Financial AI Assistant.
 
-Use ONLY the following context to answer.
+Use ONLY the context below to answer.
 
 Context:
 {context}
@@ -145,7 +153,7 @@ Context:
 Question:
 {question}
 
-If the answer is not in the context, say: "Not enough information."
+If the answer is not present in the context, reply: "Not enough information."
 """,
         input_variables=["context", "question"]
     )
