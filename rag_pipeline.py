@@ -144,7 +144,8 @@ def query_document(rag_chain, question):
 
     final_prompt = prompt.format(context=context, question=question)
 
-    answer = llm.invoke(final_prompt)
+    response = llm.invoke(final_prompt)
+    answer = response.content
 
     return {
         "answer": answer,
