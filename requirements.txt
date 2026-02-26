@@ -9,3 +9,4 @@ tiktoken
 python-dotenv
 requests
 docx2txt
+pandas

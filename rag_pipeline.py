@@ -4,155 +4,140 @@ import pandas as pd
 import docx2txt
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
 
-# ------------------------------------------
-# Load Documents (Simple & Fast)
-# ------------------------------------------
+# -------------------------------------------------------------------
+# Load Documents
+# -------------------------------------------------------------------
 def load_documents(uploaded_files):
-    """Load documents - no OCR, just text extraction"""
     docs = []
     
     with tempfile.TemporaryDirectory() as temp_dir:
         for uploaded_file in uploaded_files:
             file_name = uploaded_file.name.lower()
-            temp_file_path = os.path.join(temp_dir, uploaded_file.name)
-            
-            with open(temp_file_path, "wb") as f:
+            temp_path = os.path.join(temp_dir, uploaded_file.name)
+
+            with open(temp_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-            
+
             print(f"📄 Processing: {uploaded_file.name}")
-            
-            # PDF - simple loader, no OCR
+
+            # PDF
             if file_name.endswith(".pdf"):
-                loader = PyPDFLoader(temp_file_path)
+                loader = PyPDFLoader(temp_path)
                 pdf_docs = loader.load()
-                for doc in pdf_docs:
-                    doc.metadata["source"] = uploaded_file.name
+                for d in pdf_docs:
+                    d.metadata["source"] = uploaded_file.name
                 docs.extend(pdf_docs)
                 print(f"   ✅ PDF: {len(pdf_docs)} pages")
 
-            # Word
+            # DOCX
             elif file_name.endswith(".docx"):
-                text = docx2txt.process(temp_file_path)
+                text = docx2txt.process(temp_path)
                 if text.strip():
                     docs.append(Document(
                         page_content=text,
                         metadata={"source": uploaded_file.name}
                     ))
-                    print(f"   ✅ DOCX: {len(text)} chars")
+                print(f"   ✅ DOCX loaded")
 
             # Excel
             elif file_name.endswith((".xlsx", ".xls")):
-                df = pd.read_excel(temp_file_path)
+                df = pd.read_excel(temp_path)
                 text = df.to_string(index=False)
-                if text.strip():
-                    docs.append(Document(
-                        page_content=text,
-                        metadata={"source": uploaded_file.name}
-                    ))
-                    print(f"   ✅ Excel: {df.shape[0]} rows")
+                docs.append(Document(
+                    page_content=text,
+                    metadata={"source": uploaded_file.name}
+                ))
+                print(f"   ✅ Excel: {df.shape[0]} rows")
 
             # TXT
             elif file_name.endswith(".txt"):
-                with open(temp_file_path, 'r', encoding='utf-8') as f:
+                with open(temp_path, "r", encoding="utf-8") as f:
                     text = f.read()
-                if text.strip():
-                    docs.append(Document(
-                        page_content=text,
-                        metadata={"source": uploaded_file.name}
-                    ))
-                    print(f"   ✅ TXT: {len(text)} chars")
-    
-    print(f"\n📊 Total: {len(docs)} pages/sections")
+                docs.append(Document(
+                    page_content=text,
+                    metadata={"source": uploaded_file.name}
+                ))
+                print(f"   ✅ TXT loaded")
+
+    print(f"📊 Total sections: {len(docs)}")
     return docs
 
-# ------------------------------------------
-# Split Documents (OPTIMAL CHUNK SIZE)
-# ------------------------------------------
+
+# -------------------------------------------------------------------
+# Split Documents
+# -------------------------------------------------------------------
 def split_documents(documents):
-    """Split with optimal chunk size for speed"""
-    
     print(f"✂️ Splitting {len(documents)} documents...")
-    
-    text_splitter = RecursiveCharacterTextSplitter(
+
+    splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=150,
-        length_function=len,
         separators=["\n\n", "\n", ".", " "]
     )
-    
-    chunks = text_splitter.split_documents(documents)
+
+    chunks = splitter.split_documents(documents)
     print(f"✅ Created {len(chunks)} chunks")
     return chunks
 
-# ------------------------------------------
-# Create Embeddings (SMALL MODEL - OPTION 1)
-# ------------------------------------------
-def create_embeddings():
-    """Create embeddings with small model for speed"""
-    
-    # ✅ CHANGED: Removed "sentence-transformers/" prefix
-    embeddings = HuggingFaceEmbeddings(
-        model_name="all-MiniLM-L6-v2",  # Direct model name without prefix
-        model_kwargs={'device': 'cpu'},
-        encode_kwargs={
-            'normalize_embeddings': True
-        }
-    )
-    
-    print("⚡ FAST MODE:")
-    print("   ✅ Model: all-MiniLM-L6-v2 (80MB - 5x smaller)")
-    print("   ✅ FAISS will handle automatic batching")
-    return embeddings
 
-# ------------------------------------------
-# Build Vector Database (FAISS - Faster than Chroma)
-# ------------------------------------------
+# -------------------------------------------------------------------
+# Embeddings
+# -------------------------------------------------------------------
+def create_embeddings():
+    print("⚡ Using Embeddings: all-MiniLM-L6-v2")
+    embed = HuggingFaceEmbeddings(
+        model_name="all-MiniLM-L6-v2",
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True}
+    )
+    return embed
+
+
+# -------------------------------------------------------------------
+# Build Chroma Vector DB
+# -------------------------------------------------------------------
 def build_vector_db(uploaded_files, groq_api_key=None):
-    """Main function - OPTIMIZED for speed"""
-    
-    # Load documents
     docs = load_documents(uploaded_files)
     if not docs:
         raise ValueError("No documents loaded")
-    
-    # Split into chunks (optimal size)
+
     chunks = split_documents(docs)
-    
-    # Create embeddings (small model)
     embeddings = create_embeddings()
-    
-    print("💾 Creating FAISS vector store with automatic batching...")
-    vectordb = FAISS.from_documents(
+
+    print("💾 Creating Chroma vector store...")
+
+    vectordb = Chroma.from_documents(
         documents=chunks,
-        embedding=embeddings
+        embedding=embeddings,
+        collection_name="financial_docs"
     )
-    
-    print(f"✅ Done! {vectordb.index.ntotal} vectors")
+
+    print("✅ Vector DB Ready!")
     return vectordb
 
-# ------------------------------------------
+
+# -------------------------------------------------------------------
 # Build RAG Chain
-# ------------------------------------------
+# -------------------------------------------------------------------
 def build_rag_chain(vectordb, groq_api_key):
-    
     retriever = vectordb.as_retriever(
         search_type="similarity",
         search_kwargs={"k": 6}
     )
-    
+
     llm = ChatGroq(
         api_key=groq_api_key,
         model_name="llama-3.1-8b-instant",
         temperature=0
     )
-    
+
     prompt = PromptTemplate(
         template="""You are a Financial AI Assistant.
 
@@ -160,10 +145,12 @@ Context: {context}
 
 Question: {question}
 
-Answer (use exact numbers from context):""",
+Answer using ONLY the information from the context.
+If the context does not contain the answer, say 'Not enough information'.
+""",
         input_variables=["context", "question"]
     )
-    
+
     qa = RetrievalQA.from_chain_type(
         llm=llm,
         retriever=retriever,
@@ -171,17 +158,18 @@ Answer (use exact numbers from context):""",
         chain_type_kwargs={"prompt": prompt},
         return_source_documents=True
     )
-    
+
     return qa
 
-# ------------------------------------------
-# Query Function
-# ------------------------------------------
+
+# -------------------------------------------------------------------
+# Query
+# -------------------------------------------------------------------
 def query_document(qa_chain, question):
     try:
         result = qa_chain.invoke({"query": question})
         return {
-            "answer": result["result"],
+            "answer": result.get("result", "No answer"),
             "source_documents": result.get("source_documents", [])
         }
     except Exception as e:
