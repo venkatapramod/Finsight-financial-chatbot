@@ -82,7 +82,8 @@ def split_documents(documents):
 def create_embeddings(hf_token):
     return HuggingFaceInferenceAPIEmbeddings(
         api_key=hf_token,
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
+        model_name="sentence-transformers/all-MiniLM-L6-v2",
+        model_kwargs={"batch_size": 32}  # ✅ FIX
     )
 
 
@@ -92,6 +93,10 @@ def create_embeddings(hf_token):
 def build_vector_db(uploaded_files, hf_token):
     docs = load_documents(uploaded_files)
     chunks = split_documents(docs)
+
+    # ✅ REMOVE EMPTY CHUNKS (prevents crash)
+    chunks = [c for c in chunks if c.page_content.strip()]
+
     embeddings = create_embeddings(hf_token)
 
     vectordb = Chroma.from_documents(
