@@ -5,11 +5,9 @@ import docx2txt
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
 from langchain_groq import ChatGroq
-
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
 
@@ -39,19 +37,28 @@ def load_documents(uploaded_files):
             # DOCX
             elif file_name.endswith(".docx"):
                 text = docx2txt.process(temp_path)
-                docs.append(Document(page_content=text, metadata={"source": uploaded_file.name}))
+                docs.append(Document(
+                    page_content=text,
+                    metadata={"source": uploaded_file.name}
+                ))
 
             # EXCEL
             elif file_name.endswith((".xlsx", ".xls")):
                 df = pd.read_excel(temp_path)
                 text = df.to_string(index=False)
-                docs.append(Document(page_content=text, metadata={"source": uploaded_file.name}))
+                docs.append(Document(
+                    page_content=text,
+                    metadata={"source": uploaded_file.name}
+                ))
 
             # TXT
             elif file_name.endswith(".txt"):
                 with open(temp_path, "r", encoding="utf-8") as f:
                     text = f.read()
-                docs.append(Document(page_content=text, metadata={"source": uploaded_file.name}))
+                docs.append(Document(
+                    page_content=text,
+                    metadata={"source": uploaded_file.name}
+                ))
 
     return docs
 
@@ -61,30 +68,29 @@ def load_documents(uploaded_files):
 # -------------------------------------------------------------
 def split_documents(documents):
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=150
+        chunk_size=500,       # Reduced from 1000 for better precision
+        chunk_overlap=100     # Reduced from 150
     )
     return splitter.split_documents(documents)
 
 
 # -------------------------------------------------------------
-# EMBEDDINGS (CPU Optimized)
+# EMBEDDINGS — HuggingFace Inference API (No RAM Load)
 # -------------------------------------------------------------
-def create_embeddings():
-    return HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",
-        model_kwargs={"device": "cpu"},
-        encode_kwargs={"normalize_embeddings": True}
+def create_embeddings(hf_token):
+    return HuggingFaceInferenceAPIEmbeddings(
+        api_key=hf_token,
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
     )
 
 
 # -------------------------------------------------------------
 # BUILD VECTOR DB
 # -------------------------------------------------------------
-def build_vector_db(uploaded_files, groq_api_key=None):
+def build_vector_db(uploaded_files, groq_api_key=None, hf_token=None):
     docs = load_documents(uploaded_files)
     chunks = split_documents(docs)
-    embeddings = create_embeddings()
+    embeddings = create_embeddings(hf_token)
 
     vectordb = Chroma.from_documents(
         documents=chunks,
@@ -95,7 +101,7 @@ def build_vector_db(uploaded_files, groq_api_key=None):
 
 
 # -------------------------------------------------------------
-# IMPROVED FINANCIAL PROMPT (More Confident, Factual)
+# BUILD RAG CHAIN
 # -------------------------------------------------------------
 def build_rag_chain(vectordb, groq_api_key):
     llm = ChatGroq(
@@ -104,7 +110,9 @@ def build_rag_chain(vectordb, groq_api_key):
         temperature=0
     )
 
-    retriever = vectordb.as_retriever(search_kwargs={"k": 6})
+    retriever = vectordb.as_retriever(
+        search_kwargs={"k": 8}  # Increased from 6 to compensate smaller chunks
+    )
 
     prompt = PromptTemplate(
         template="""
@@ -143,7 +151,6 @@ def query_document(rag_chain, question):
     context = "\n\n".join([d.page_content for d in docs])
 
     final_prompt = prompt.format(context=context, question=question)
-
     response = llm.invoke(final_prompt)
     answer = response.content
 
