@@ -6,7 +6,7 @@ import docx2txt
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
 
 # ✅ FIXED IMPORTS
@@ -77,27 +77,29 @@ def split_documents(documents):
 
 
 # -------------------------------------------------------------
-# EMBEDDINGS (HF API)
 # -------------------------------------------------------------
-def create_embeddings(hf_token):
-    return HuggingFaceInferenceAPIEmbeddings(
-        api_key=hf_token,
+# EMBEDDINGS (Local, CPU - avoids HF Inference API batch bug)
+# -------------------------------------------------------------
+def create_embeddings():
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+    return HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-MiniLM-L6-v2",
-        model_kwargs={"batch_size": 32}  # ✅ FIX
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True}
     )
 
 
 # -------------------------------------------------------------
 # BUILD VECTOR DB
 # -------------------------------------------------------------
-def build_vector_db(uploaded_files, hf_token):
+def build_vector_db(uploaded_files, hf_token=None):   # hf_token no longer needed
     docs = load_documents(uploaded_files)
     chunks = split_documents(docs)
 
-    # ✅ REMOVE EMPTY CHUNKS (prevents crash)
+    # Remove empty chunks (prevents crash)
     chunks = [c for c in chunks if c.page_content.strip()]
 
-    embeddings = create_embeddings(hf_token)
+    embeddings = create_embeddings()   # local model, no API key
 
     vectordb = Chroma.from_documents(
         documents=chunks,
@@ -106,8 +108,6 @@ def build_vector_db(uploaded_files, hf_token):
     )
 
     return vectordb
-
-
 # -------------------------------------------------------------
 # BUILD RAG CHAIN
 # -------------------------------------------------------------
