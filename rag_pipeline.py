@@ -8,6 +8,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
 from langchain_groq import ChatGroq
+
+# ✅ FIXED IMPORTS
 from langchain_core.prompts import PromptTemplate
 from langchain_core.documents import Document
 
@@ -68,14 +70,14 @@ def load_documents(uploaded_files):
 # -------------------------------------------------------------
 def split_documents(documents):
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=500,       # Reduced from 1000 for better precision
-        chunk_overlap=100     # Reduced from 150
+        chunk_size=500,
+        chunk_overlap=100
     )
     return splitter.split_documents(documents)
 
 
 # -------------------------------------------------------------
-# EMBEDDINGS — HuggingFace Inference API (No RAM Load)
+# EMBEDDINGS (HF API)
 # -------------------------------------------------------------
 def create_embeddings(hf_token):
     return HuggingFaceInferenceAPIEmbeddings(
@@ -87,7 +89,7 @@ def create_embeddings(hf_token):
 # -------------------------------------------------------------
 # BUILD VECTOR DB
 # -------------------------------------------------------------
-def build_vector_db(uploaded_files, groq_api_key=None, hf_token=None):
+def build_vector_db(uploaded_files, hf_token):
     docs = load_documents(uploaded_files)
     chunks = split_documents(docs)
     embeddings = create_embeddings(hf_token)
@@ -95,8 +97,9 @@ def build_vector_db(uploaded_files, groq_api_key=None, hf_token=None):
     vectordb = Chroma.from_documents(
         documents=chunks,
         embedding=embeddings,
-        collection_name="financial_docs"
+        persist_directory="./chroma_db"
     )
+
     return vectordb
 
 
@@ -111,7 +114,7 @@ def build_rag_chain(vectordb, groq_api_key):
     )
 
     retriever = vectordb.as_retriever(
-        search_kwargs={"k": 8}  # Increased from 6 to compensate smaller chunks
+        search_kwargs={"k": 8}
     )
 
     prompt = PromptTemplate(
@@ -120,10 +123,9 @@ You are a highly accurate financial analysis assistant.
 
 Use ONLY the provided document context to answer.
 Do NOT guess beyond the given data.
+
 When financial reports use the terms "net sales" or "total net sales",
 treat them as equivalent to "revenue" unless explicitly separated.
-
-Provide clear, strong financial answers.
 
 Context:
 {context}
@@ -152,9 +154,8 @@ def query_document(rag_chain, question):
 
     final_prompt = prompt.format(context=context, question=question)
     response = llm.invoke(final_prompt)
-    answer = response.content
 
     return {
-        "answer": answer,
+        "answer": response.content,
         "source_documents": docs
     }
