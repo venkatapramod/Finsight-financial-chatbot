@@ -1,13 +1,13 @@
-# API Keys
+
 api key.txt
 .streamlit/secrets.toml
 
-# Virtual Environment
+
 ragenv/
 venv/
 env/
 ENV/
 
-# Python cache
+
 __pycache__/
 *.pyc
