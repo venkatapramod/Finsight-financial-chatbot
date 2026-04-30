@@ -5,7 +5,6 @@ from rag_pipeline import build_vector_db, build_rag_chain, query_document
 
 st.set_page_config(page_title="Financial RAG Chatbot", layout="wide", page_icon="💰")
 
-# ---------------- SIDEBAR ----------------
 with st.sidebar:
     st.title("📁 Upload Documents")
 
@@ -35,7 +34,6 @@ with st.sidebar:
     st.markdown("---")
     st.caption("Built with LangChain · Groq · Streamlit")
 
-# ---------------- SAFE SECRETS ----------------
 HF_TOKEN = st.secrets.get("HF_TOKEN") or os.getenv("HF_TOKEN")
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
 
@@ -43,18 +41,16 @@ if not HF_TOKEN or not GROQ_API_KEY:
     st.error("❌ Missing API keys. Please set HF_TOKEN and GROQ_API_KEY.")
     st.stop()
 
-# ---------------- SESSION STATE ----------------
 if "rag_chain" not in st.session_state:
     st.session_state.rag_chain = None
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# ---------------- MAIN UI ----------------
+
 st.title("💰 Financial RAG Chatbot")
 st.write("Upload your financial documents (PDF / Word / Excel) and ask questions.")
 
-# ---------------- PROCESS DOCUMENTS ----------------
 if process_button:
     if not uploaded_files:
         st.warning("⚠️ Please upload at least one file first.")
@@ -65,10 +61,9 @@ if process_button:
             st.session_state.chat_history = []  # reset chat on new doc
         st.success("✅ Documents processed! You can now ask questions.")
 
-# ---------------- CHAT UI ----------------
+
 if st.session_state.rag_chain:
 
-    # Display full chat history
     for chat in st.session_state.chat_history:
         with st.chat_message("user"):
             st.write(chat["question"])
@@ -84,15 +79,13 @@ if st.session_state.rag_chain:
                         if i < len(chat["sources"]) - 1:
                             st.markdown("---")
 
-    # ✅ st.chat_input — auto-clears, pinned to bottom, Enter to send
+ 
     question = st.chat_input("Ask a question about your documents...")
 
     if question:
-        # Show user message instantly
         with st.chat_message("user"):
             st.write(question)
 
-        # Get and show answer
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 result = query_document(st.session_state.rag_chain, question)
@@ -106,7 +99,7 @@ if st.session_state.rag_chain:
                         if i < len(result["source_documents"]) - 1:
                             st.markdown("---")
 
-        # Save to history
+      
         st.session_state.chat_history.append({
             "question": question,
             "answer": result["answer"],
@@ -114,7 +107,7 @@ if st.session_state.rag_chain:
         })
 
 else:
-    # Placeholder when no docs processed yet
+  
     st.info("⏳ First time processing takes 1–2 minutes. Subsequent queries will be faster!")
     st.warning("👆 Please upload your financial documents in the sidebar and click **Process Documents** to get started!")
 
