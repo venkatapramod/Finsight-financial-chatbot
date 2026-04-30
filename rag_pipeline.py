@@ -9,14 +9,11 @@ from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
 
-# ✅ FIXED IMPORTS
 from langchain_core.prompts import PromptTemplate
 from langchain_core.documents import Document
 
 
-# -------------------------------------------------------------
-# LOAD DOCUMENTS
-# -------------------------------------------------------------
+
 def load_documents(uploaded_files):
     docs = []
 
@@ -28,7 +25,7 @@ def load_documents(uploaded_files):
             with open(temp_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
 
-            # PDF
+          
             if file_name.endswith(".pdf"):
                 loader = PyPDFLoader(temp_path)
                 pdf_docs = loader.load()
@@ -36,7 +33,7 @@ def load_documents(uploaded_files):
                     d.metadata["source"] = uploaded_file.name
                 docs.extend(pdf_docs)
 
-            # DOCX
+            
             elif file_name.endswith(".docx"):
                 text = docx2txt.process(temp_path)
                 docs.append(Document(
@@ -44,7 +41,7 @@ def load_documents(uploaded_files):
                     metadata={"source": uploaded_file.name}
                 ))
 
-            # EXCEL
+            
             elif file_name.endswith((".xlsx", ".xls")):
                 df = pd.read_excel(temp_path)
                 text = df.to_string(index=False)
@@ -53,7 +50,7 @@ def load_documents(uploaded_files):
                     metadata={"source": uploaded_file.name}
                 ))
 
-            # TXT
+            
             elif file_name.endswith(".txt"):
                 with open(temp_path, "r", encoding="utf-8") as f:
                     text = f.read()
@@ -65,9 +62,7 @@ def load_documents(uploaded_files):
     return docs
 
 
-# -------------------------------------------------------------
-# SPLIT DOCUMENTS
-# -------------------------------------------------------------
+
 def split_documents(documents):
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=500,
@@ -76,10 +71,7 @@ def split_documents(documents):
     return splitter.split_documents(documents)
 
 
-# -------------------------------------------------------------
-# -------------------------------------------------------------
-# EMBEDDINGS (Local, CPU - avoids HF Inference API batch bug)
-# -------------------------------------------------------------
+
 def create_embeddings():
     from langchain_community.embeddings import HuggingFaceEmbeddings
     return HuggingFaceEmbeddings(
@@ -89,14 +81,12 @@ def create_embeddings():
     )
 
 
-# -------------------------------------------------------------
-# BUILD VECTOR DB
-# -------------------------------------------------------------
+
 def build_vector_db(uploaded_files, hf_token=None):   # hf_token no longer needed
     docs = load_documents(uploaded_files)
     chunks = split_documents(docs)
 
-    # Remove empty chunks (prevents crash)
+   
     chunks = [c for c in chunks if c.page_content.strip()]
 
     embeddings = create_embeddings()   # local model, no API key
@@ -108,9 +98,7 @@ def build_vector_db(uploaded_files, hf_token=None):   # hf_token no longer neede
     )
 
     return vectordb
-# -------------------------------------------------------------
-# BUILD RAG CHAIN
-# -------------------------------------------------------------
+
 def build_rag_chain(vectordb, groq_api_key):
     llm = ChatGroq(
         api_key=groq_api_key,
@@ -146,9 +134,7 @@ Answer in a direct, factual manner:
     return {"llm": llm, "retriever": retriever, "prompt": prompt}
 
 
-# -------------------------------------------------------------
-# QUERY FUNCTION
-# -------------------------------------------------------------
+
 def query_document(rag_chain, question):
     llm = rag_chain["llm"]
     retriever = rag_chain["retriever"]
