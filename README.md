@@ -11,6 +11,8 @@ Instead of generating generic answers, the system retrieves relevant document co
 
 ---
 ## 📷 Demo
+
+Demo Link: https://finsight-financial-chatbot-fjcsiydyuhe5dkcgjitgpg.streamlit.app/
 <img width="1920" height="1080" alt="Screenshot " src="https://github.com/user-attachments/assets/b733f175-2ea9-4fdb-b6b9-b174caf8b738" />
 
 <img width="1920" height="1080" alt="demo" src="https://github.com/user-attachments/assets/89936907-a634-4d69-904e-0d49d75eb115" />
